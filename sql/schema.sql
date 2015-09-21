@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS `login_log` (
 
 CREATE INDEX `idx_login_log_1` ON `login_log` (`user_id`);
 CREATE INDEX `idx_login_log_2` ON `login_log` (`ip`);
+CREATE INDEX `idx_login_log_3` ON `login_log` (`user_id`, `succeeded`);
+CREATE INDEX `idx_login_log_4` ON `login_log` (`ip`, `succeeded`);
