@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `salt` varchar(255) NOT NULL
 ) DEFAULT CHARSET=utf8;
 
-CREATE INDEX `idx_login_and_salt_on_users` ON `users` (`login`, `salt`);
+CREATE INDEX `idx_login_and_salt_on_users` ON `users` (`login`, `salt`, `password_hash`);
 
 CREATE TABLE IF NOT EXISTS `login_log` (
   `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
