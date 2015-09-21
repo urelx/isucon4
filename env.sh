@@ -19,5 +19,6 @@ export ISU4_DB_PORT=3306
 export ISU4_DB_USER=isucon
 export ISU4_DB_PASSWORD=isucon
 export ISU4_DB_NAME=isu4_qualifier
+export NEWRELIC_LICENSE_KEY=cbb4b8adc9ab0e84b71de0711c94bc8ca705f988
 
 exec $*
