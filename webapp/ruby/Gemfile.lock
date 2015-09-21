@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    dalli (2.7.4)
     dotenv (0.11.1)
       dotenv-deployment (~> 0.0.2)
     dotenv-deployment (0.0.2)
@@ -33,6 +34,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  dalli
   foreman
   mysql2-cs-bind
   rack-flash3
