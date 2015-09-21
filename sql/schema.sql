@@ -16,5 +16,5 @@ CREATE TABLE IF NOT EXISTS `login_log` (
   `succeeded` tinyint NOT NULL
 ) DEFAULT CHARSET=utf8;
 
-CREATE INDEX ON `login_log` (`user_id`);
-CREATE INDEX ON `login_log` (`ip`);
+CREATE INDEX `idx_login_log_1` ON `login_log` (`user_id`);
+CREATE INDEX `idx_login_log_2` ON `login_log` (`ip`);
