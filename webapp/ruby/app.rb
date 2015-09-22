@@ -34,7 +34,7 @@ module Isucon4
       end
 
       def redis
-        Thread.current[:isu4_redis] ||= Redis.new(path: "/tmp/redis.sock")
+        Thread.current[:isu4_redis] ||= Redis.new(path: "/tmp/redis.sock", driver: 'hiredis')
       end
 
       def calculate_password_hash(password, salt)
