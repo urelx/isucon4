@@ -4,11 +4,13 @@ require 'mysql2-cs-bind'
 require 'rack-flash'
 require 'json'
 require 'erubis'
+require 'rack-lineprof' if ENV['ENABLE_RACK_LINEPROF']
 
 module Isucon4
   class App < Sinatra::Base
     use Rack::Session::Cookie, secret: ENV['ISU4_SESSION_SECRET'] || 'shirokane'
     use Rack::Flash
+    use Rack::Lineprof, profile: 'app.rb' if ENV['ENABLE_RACK_LINEPROF']
     set :public_folder, File.expand_path('../../public', __FILE__)
 
     helpers do
