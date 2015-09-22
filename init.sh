@@ -12,4 +12,4 @@ mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < sql/schema.sql
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < sql/dummy_users.sql
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < sql/dummy_log.sql
 
-BUNDLE_GEMFILE=webapp/ruby/Gemfile bundle exec ruby init_redis.rb
+BUNDLE_GEMFILE=webapp/ruby/Gemfile bundle exec ruby isucon4/init_redis.rb
