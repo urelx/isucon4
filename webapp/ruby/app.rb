@@ -9,9 +9,8 @@ require 'redis'
 
 module Isucon4
   class App < Sinatra::Base
-    use Rack::Session::Cookie, secret: ENV['ISU4_SESSION_SECRET'] || 'shirokane'
-    use Rack::Flash
     use Rack::Lineprof, profile: 'app.rb' if ENV['ENABLE_RACK_LINEPROF']
+    use Rack::Session::Cookie, secret: ENV['ISU4_SESSION_SECRET'] || 'shirokane'
     set :public_folder, File.expand_path('../../public', __FILE__)
 
     helpers do
@@ -167,20 +166,18 @@ module Isucon4
       else
         case err
         when :locked
-          flash[:notice] = "This account is locked."
+          redirect to('/?error=locked')
         when :banned
-          flash[:notice] = "You're banned."
+          redirect to('/?error=banned')
         else
-          flash[:notice] = "Wrong username or password"
+          redirect to('/?error=wrong')
         end
-        redirect '/'
       end
     end
 
     get '/mypage' do
       unless current_user
-        flash[:notice] = "You must be logged in"
-        redirect '/'
+        redirect to('/?error=not_login')
       end
       erb :mypage, layout: :base
     end
