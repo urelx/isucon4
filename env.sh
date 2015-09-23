@@ -3,6 +3,7 @@
 export PATH=/usr/local/bin:$PATH
 export PATH=/usr/local/go/bin:$PATH
 export PATH=/home/isucon/.local/ruby/bin:$PATH
+export PATH=/home/isucon/.local/jruby/jruby-9.0.1.0/bin:$PATH
 export PATH=/home/isucon/.local/node/bin:$PATH
 export PATH=/home/isucon/.local/python/bin:$PATH
 export PATH=/home/isucon/.local/perl/bin:$PATH
