@@ -155,7 +155,7 @@ module Isucon4
     end
 
     get '/' do
-      erb :index, layout: :base
+      erb :index
     end
 
     post '/login' do
@@ -179,7 +179,7 @@ module Isucon4
       unless current_user
         redirect to('/?error=not_login')
       end
-      erb :mypage, layout: :base
+      erb :mypage
     end
 
     get '/report' do
