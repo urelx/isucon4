@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS `login_log` (
   `user_id` int,
   `login` varchar(255) NOT NULL,
   `ip` varchar(255) NOT NULL,
-  `succeeded` tinyint NOT NULL
+  `succeeded` tinyint NOT NULL,
+  KEY `idx_user_id`(`user_id`)
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX `idx_login_log_1` ON `login_log` (`user_id`);
