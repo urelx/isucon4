@@ -3,11 +3,14 @@ require 'digest/sha2'
 require 'mysql2-cs-bind'
 require 'rack-flash'
 require 'json'
+require 'erubis'
+require 'rack-lineprof' if ENV['ENABLE_RACK_LINEPROF']
+require 'redis'
 
 module Isucon4
   class App < Sinatra::Base
+    use Rack::Lineprof, profile: 'app.rb' if ENV['ENABLE_RACK_LINEPROF']
     use Rack::Session::Cookie, secret: ENV['ISU4_SESSION_SECRET'] || 'shirokane'
-    use Rack::Flash
     set :public_folder, File.expand_path('../../public', __FILE__)
 
     helpers do
@@ -29,32 +32,64 @@ module Isucon4
         )
       end
 
+      def redis
+        Thread.current[:isu4_redis] ||= Redis.new(path: "/tmp/redis.sock", driver: 'hiredis')
+      end
+
       def calculate_password_hash(password, salt)
         Digest::SHA256.hexdigest "#{password}:#{salt}"
       end
 
+      def redis_key_user(login)
+        "isu4:login_fail:user:#{login}"
+      end
+
+      def redis_key_ip
+        "isu4:login_fail:ip:#{request.ip}"
+      end
+
+      def redis_last_login_key(user_id)
+        "isu4:login_log:user:#{user_id}"
+      end
+
+      def redis_last_before_login_key(user_id)
+        "isu4:login_log_before:user:#{user_id}"
+      end
+
+      def update_last_login(user_id)
+        last_key        = redis_last_login_key(user_id)
+        last_before_key = redis_last_before_login_key(user_id)
+
+        %w(ip date).each {|k| redis.hset(last_before_key, k, redis.hget(last_key, k))}
+
+        redis.hset(last_key, 'ip',   request.ip)
+        redis.hset(last_key, 'date', Time.now.strftime("%Y-%m-%d %H:%M:%S"))
+      end
+
       def login_log(succeeded, login, user_id = nil)
-        db.xquery("INSERT INTO login_log" \
-                  " (`created_at`, `user_id`, `login`, `ip`, `succeeded`)" \
-                  " VALUES (?,?,?,?,?)",
-                 Time.now, user_id, login, request.ip, succeeded ? 1 : 0)
+        if succeeded
+          redis.del(redis_key_ip)
+          if user_id
+            redis.del(redis_key_user(user_id))
+            update_last_login(user_id)
+          end
+        else
+          redis.incr(redis_key_ip)
+          redis.incr(redis_key_user(user_id)) if user_id
+        end
       end
 
       def user_locked?(user)
         return nil unless user
-        log = db.xquery("SELECT COUNT(1) AS failures FROM login_log WHERE user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0);", user['id'], user['id']).first
-
-        config[:user_lock_threshold] <= log['failures']
+        config[:user_lock_threshold] <= redis.get(redis_key_user(user['id'])).to_i
       end
 
       def ip_banned?
-        log = db.xquery("SELECT COUNT(1) AS failures FROM login_log WHERE ip = ? AND id > IFNULL((select id from login_log where ip = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0);", request.ip, request.ip).first
-
-        config[:ip_ban_threshold] <= log['failures']
+        config[:ip_ban_threshold] <= redis.get(redis_key_ip).to_i
       end
 
       def attempt_login(login, password)
-        user = db.xquery('SELECT * FROM users WHERE login = ?', login).first
+        user = db.xquery('SELECT id, salt, password_hash FROM users WHERE login = ?', login).first
 
         if ip_banned?
           login_log(false, login, user ? user['id'] : nil)
@@ -93,53 +128,34 @@ module Isucon4
 
       def last_login
         return nil unless current_user
-
-        db.xquery('SELECT * FROM login_log WHERE succeeded = 1 AND user_id = ? ORDER BY id DESC LIMIT 2', current_user['id']).each.last
+        key = redis_last_before_login_key(session[:user_id])
+        {ip: redis.hget(key, 'ip'), login: current_user['login'], date: redis.hget(key, 'date')}
       end
 
       def banned_ips
-        ips = []
         threshold = config[:ip_ban_threshold]
 
-        not_succeeded = db.xquery('SELECT ip FROM (SELECT ip, MAX(succeeded) as max_succeeded, COUNT(1) as cnt FROM login_log GROUP BY ip) AS t0 WHERE t0.max_succeeded = 0 AND t0.cnt >= ?', threshold)
-
-        ips.concat not_succeeded.each.map { |r| r['ip'] }
-
-        last_succeeds = db.xquery('SELECT ip, MAX(id) AS last_login_id FROM login_log WHERE succeeded = 1 GROUP by ip')
-
-        last_succeeds.each do |row|
-          count = db.xquery('SELECT COUNT(1) AS cnt FROM login_log WHERE ip = ? AND ? < id', row['ip'], row['last_login_id']).first['cnt']
-          if threshold <= count
-            ips << row['ip']
-          end
+        redis.keys("isu4:login_fail:ip:*").select do |k|
+          redis.get(k).to_i >= threshold
+        end.map do |k|
+          k.split(':').last
         end
-
-        ips
       end
 
       def locked_users
-        user_ids = []
         threshold = config[:user_lock_threshold]
 
-        not_succeeded = db.xquery('SELECT user_id, login FROM (SELECT user_id, login, MAX(succeeded) as max_succeeded, COUNT(1) as cnt FROM login_log GROUP BY user_id) AS t0 WHERE t0.user_id IS NOT NULL AND t0.max_succeeded = 0 AND t0.cnt >= ?', threshold)
-
-        user_ids.concat not_succeeded.each.map { |r| r['login'] }
-
-        last_succeeds = db.xquery('SELECT user_id, login, MAX(id) AS last_login_id FROM login_log WHERE user_id IS NOT NULL AND succeeded = 1 GROUP BY user_id')
-
-        last_succeeds.each do |row|
-          count = db.xquery('SELECT COUNT(1) AS cnt FROM login_log WHERE user_id = ? AND ? < id', row['user_id'], row['last_login_id']).first['cnt']
-          if threshold <= count
-            user_ids << row['login']
-          end
+        redis.keys("isu4:login_fail:user:*").select do |k|
+          redis.get(k).to_i >= threshold
+        end.map do |k|
+          user_id = k.split(':').last
+          db.xquery('SELECT login FROM users WHERE id = ?', user_id).first['login']
         end
-
-        user_ids
       end
     end
 
     get '/' do
-      erb :index, layout: :base
+      erb :index
     end
 
     post '/login' do
@@ -150,25 +166,25 @@ module Isucon4
       else
         case err
         when :locked
-          flash[:notice] = "This account is locked."
+          redirect to('/?error=locked')
         when :banned
-          flash[:notice] = "You're banned."
+          redirect to('/?error=banned')
         else
-          flash[:notice] = "Wrong username or password"
+          redirect to('/?error=wrong')
         end
-        redirect '/'
       end
     end
 
     get '/mypage' do
       unless current_user
-        flash[:notice] = "You must be logged in"
-        redirect '/'
+        redirect to('/?error=not_login')
       end
-      erb :mypage, layout: :base
+      erb :mypage
     end
 
     get '/report' do
+      redis.save
+
       content_type :json
       {
         banned_ips: banned_ips,

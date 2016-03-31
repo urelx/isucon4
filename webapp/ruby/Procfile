@@ -1,1 +1,2 @@
-unicorn: bundle exec unicorn -c unicorn_config.rb -p 8080
+#unicorn: bundle exec unicorn -c unicorn_config.rb -p 8080
+rhebok: bundle exec rackup -s Rhebok -O ConfigFile=rhebok_config.rb
